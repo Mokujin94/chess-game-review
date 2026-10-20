@@ -73,6 +73,30 @@ function forkOf(fenAfter, mv) {
   return targets.length >= 2 || (targets.length >= 1 && check) ? { from: mv.to, targets } : null;
 }
 
+const PIECE_ACC = { p: 'пешку', n: 'коня', b: 'слона', r: 'ладью', q: 'ферзя', k: 'короля' };
+
+// Линия продолжения с подписями шагов: «Соперник: Nxd7 — забирает слона».
+function lineSteps(fen, ucis) {
+  const c = new Chess(fen);
+  const out = [];
+  for (let i = 0; i < ucis.length; i++) {
+    const u = ucis[i];
+    let mv;
+    try {
+      mv = c.move({ from: u.slice(0, 2), to: u.slice(2, 4), promotion: u[4] });
+    } catch {
+      break;
+    }
+    const who = i % 2 === 0 ? 'Соперник' : 'Вы';
+    const acts = [];
+    if (mv.san.includes('#')) acts.push('мат');
+    else if (mv.san.includes('+')) acts.push('шах');
+    if (mv.captured) acts.push(`забирает ${PIECE_ACC[mv.captured]}`);
+    out.push({ uci: u, san: mv.san, text: `${who}: ${mv.san}${acts.length ? ` — ${acts.join(', ')}` : ''}` });
+  }
+  return out;
+}
+
 function isSacrifice(move, afterLines) {
   const reply = afterLines[0]?.pv?.[0];
   if (!reply || move.piece === 'p' || move.piece === 'k') return false;
@@ -233,6 +257,7 @@ export async function reviewGame(pgn, engine, { depth = 14, book, onProgress } =
       }
     }
     entry.shows = shows;
+    entry.replySteps = lineSteps(m.after, entry.replyPvUci);
     entry.text = coach(entry, 'ru');
     result.push(entry);
   });

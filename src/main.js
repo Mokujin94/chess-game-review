@@ -24,7 +24,7 @@ let cg;
 let data = null;
 let cur = 0;
 let flipped = false;
-let ui = { show: null, why: false, retry: null };
+let ui = { show: null, why: false, step: 0, retry: null };
 let voices = [];
 let voice = null;
 let voiceOn = false;
@@ -201,10 +201,11 @@ function baseBoard(m) {
 }
 
 // Автоповтор линии на доске: ход в секунду со стрелкой следующего хода.
-function playLine(fen0, uci) {
+function playLine(fen0, uci, onStep) {
   stopAuto();
   const c = new Chess(fen0);
   let i = 0;
+  onStep?.(0);
   showBoard(fen0, { arrows: [uci[0]] });
   autoTimer = setInterval(() => {
     if (i >= uci.length) return stopAuto();
@@ -215,8 +216,35 @@ function playLine(fen0, uci) {
       return stopAuto();
     }
     i++;
+    onStep?.(i);
     showBoard(c.fen(), { arrows: uci[i] ? [uci[i]] : [], lastMove: [u.slice(0, 2), u.slice(2, 4)], check: c.inCheck() });
-  }, 1000);
+  }, 1100);
+}
+
+// «Объяснить»: на доске разыгрывается продолжение после вашего хода (почему он плох).
+function whyView(m, k) {
+  const c = new Chess(m.fen);
+  const ucis = m.replySteps.map((x) => x.uci);
+  let last = [m.from, m.to];
+  for (let i = 0; i < k && i < ucis.length; i++) {
+    c.move({ from: ucis[i].slice(0, 2), to: ucis[i].slice(2, 4), promotion: ucis[i][4] });
+    last = [ucis[i].slice(0, 2), ucis[i].slice(2, 4)];
+  }
+  return { fen: c.fen(), arrows: ucis[k] ? [ucis[k]] : [], lastMove: last, check: c.inCheck() };
+}
+
+function setWhyStep(k) {
+  ui.step = k;
+  document.querySelectorAll('.step').forEach((e) => e.classList.toggle('on', Number(e.dataset.k) === k));
+}
+
+function startWhy(m) {
+  stopAuto();
+  ui.why = true;
+  ui.show = null;
+  placeBadge(null);
+  renderCoach(m);
+  playLine(m.fen, m.replySteps.map((x) => x.uci), setWhyStep);
 }
 
 const showOf = (m, id) =>
@@ -229,7 +257,10 @@ function restoreBoard() {
   const m = curMove();
   stopAuto();
   if (ui.retry) return;
-  if (ui.show && m) {
+  if (ui.why && m) {
+    const v = whyView(m, ui.step);
+    showBoard(v.fen, { arrows: v.arrows, lastMove: v.lastMove, check: v.check });
+  } else if (ui.show && m) {
     const s = showOf(m, ui.show);
     showBoard(s.fen, { arrows: s.play ? [s.play[0]] : s.arrows, circles: s.circles });
   } else baseBoard(m);
@@ -238,6 +269,7 @@ function restoreBoard() {
 function activateShow(m, id) {
   stopAuto();
   ui.show = ui.show === id ? null : id;
+  ui.why = false;
   placeBadge(ui.show ? null : m);
   renderCoach(m);
   if (!ui.show) return baseBoard(m);
@@ -250,7 +282,7 @@ function go(ply, keepUi = false) {
   const next = Math.max(0, Math.min(data.moves.length, ply));
   if (!keepUi && (next !== cur || ui.retry)) {
     if (ui.retry) initBoard();
-    ui = { show: null, why: false, retry: null };
+    ui = { show: null, why: false, step: 0, retry: null };
   }
   cur = next;
   stopAuto();
@@ -286,7 +318,7 @@ function go(ply, keepUi = false) {
 function startRetry(m) {
   stopAuto();
   speech.stop();
-  ui = { show: null, why: false, retry: { result: null } };
+  ui = { show: null, why: false, step: 0, retry: { result: null } };
   const c = new Chess(m.beforeFen);
   const dests = new Map();
   for (const mv of c.moves({ verbose: true })) {
@@ -330,7 +362,7 @@ async function onRetryMove(m, from, to) {
 
 function exitRetry() {
   initBoard();
-  ui = { show: null, why: false, retry: null };
+  ui = { show: null, why: false, step: 0, retry: null };
   go(cur, true);
 }
 
@@ -373,7 +405,12 @@ function renderCoach(m) {
     if (ui.show === 'best') {
       html += `<div class="bestline hl" data-play="1" title="Нажмите, чтобы проиграть линию"><b>${m.bestSan}</b> <span>${m.bestPv.slice(1).join(' ')}</span> <em>▶ показать</em></div>`;
     }
-    if (ui.why) html += `<div class="why">${explainBest(m)}</div>`;
+    if (ui.why) {
+      const steps = [{ text: `Ваш ход: ${m.san}`, k: 0 }, ...m.replySteps.map((x, i) => ({ text: x.text, k: i + 1 }))];
+      html +=
+        `<div class="why"><div class="steps">${steps.map((x) => `<div class="step ${x.k === ui.step ? 'on' : ''}" data-k="${x.k}">${x.text}</div>`).join('')}</div>` +
+        `<div class="whytext">${explainBest(m)}</div><div class="actions"><button id="replaybtn">▶ Ещё раз</button></div></div>`;
+    }
   }
   box.innerHTML = html + '</div>';
   if ($('speakbtn')) $('speakbtn').onclick = () => speakMove(m, { now: true });
@@ -382,11 +419,25 @@ function renderCoach(m) {
       b.onclick = () => activateShow(m, b.dataset.show);
     });
     $('whybtn').onclick = () => {
-      ui.why = !ui.why;
-      renderCoach(m);
+      if (ui.why) {
+        ui.why = false;
+        stopAuto();
+        renderCoach(m);
+        baseBoard(m);
+        placeBadge(m);
+      } else startWhy(m);
       if (ui.why && voiceOn) speakMove(m, { explain: true, now: true });
     };
     $('retrybtn').onclick = () => startRetry(m);
+    if ($('replaybtn')) $('replaybtn').onclick = () => startWhy(m);
+    box.querySelectorAll('.step').forEach((el) => {
+      el.onclick = () => {
+        stopAuto();
+        setWhyStep(Number(el.dataset.k));
+        const v = whyView(m, ui.step);
+        showBoard(v.fen, { arrows: v.arrows, lastMove: v.lastMove, check: v.check });
+      };
+    });
   }
 }
 
