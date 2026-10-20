@@ -1,0 +1,5 @@
+.venv
+.tts-cache
+node_modules
+dist
+.claude
