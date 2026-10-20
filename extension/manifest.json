@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Моя шахматная история — тренировка с ботом",
+  "version": "1.0.0",
+  "permissions": ["tabs"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html" },
+  "content_scripts": [
+    { "matches": ["https://www.chess.com/play/computer*"], "js": ["bot.js"] },
+    { "matches": ["https://mokujin94.github.io/chess-game-review/*", "http://localhost:5173/*"], "js": ["bridge.js"] }
+  ]
+}

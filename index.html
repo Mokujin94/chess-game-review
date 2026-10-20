@@ -49,6 +49,20 @@
       </div>
     </section>
 
+    <section class="card history-panel">
+      <h2>Тренировка по моей истории</h2>
+      <p>Узнавайте свои прошлые ходы во время игры с ботом chess.com. История хранится в этом браузере.</p>
+      <div class="field-row">
+        <input id="history-user" placeholder="Ваш ник chess.com" aria-label="Ник для загрузки истории" />
+        <select id="history-limit" aria-label="Количество новых партий"><option value="10">10 новых партий</option><option value="50">50 новых партий</option><option value="100">100 новых партий</option></select>
+        <button id="history-import">Загрузить и изучить историю</button>
+        <button id="history-connect" class="primary">Подключить бота</button>
+      </div>
+      <p id="history-status" role="status"></p>
+      <div id="history-matches" aria-live="polite"></div>
+      <details><summary>Как подключить игру с ботом</summary><ol><li>Скачайте <a href="./bot-extension.zip">расширение для Chrome / Edge</a> и распакуйте архив.</li><li>Откройте chrome://extensions (в Edge — edge://extensions), включите режим разработчика, нажмите «Загрузить распакованное» и выберите папку расширения.</li><li>Обновите эту страницу и вкладку chess.com. Загрузите историю по нику.</li><li>Нажмите «Подключить бота» и начните новую партию на <a href="https://www.chess.com/play/computer" target="_blank" rel="noopener">странице игры с компьютером</a>. Держите обе вкладки открытыми.</li></ol><p>Импорт повторной порцией добавляет следующие партии. Анализ большой истории может занять много времени. Изменения интерфейса chess.com могут потребовать обновления расширения.</p></details>
+    </section>
+
     <section id="review" hidden>
       <div class="layout">
         <div class="left">

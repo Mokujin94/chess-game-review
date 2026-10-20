@@ -1,3 +1,4 @@
+import './history.js';
 import { Chess } from 'chess.js';
 import { Chessground } from '@lichess-org/chessground';
 import '@lichess-org/chessground/assets/chessground.base.css';
